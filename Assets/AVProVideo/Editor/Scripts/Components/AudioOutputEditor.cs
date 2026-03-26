@@ -7,97 +7,97 @@ using UnityEngine;
 
 namespace RenderHeads.Media.AVProVideo.Editor
 {
-	/// <summary>
-	/// Editor for the AudioOutput component
-	/// </summary>
-	[CanEditMultipleObjects]
-	[CustomEditor(typeof(AudioOutput))]
-	public class AudioOutputEditor : UnityEditor.Editor
-	{
-		private static readonly GUIContent _guiTextChannel = new GUIContent("Channel");
-		private static readonly GUIContent _guiTextChannels = new GUIContent("Channels");
-		private static readonly string[] _channelMaskOptions = { "1", "2", "3", "4", "5", "6", "7", "8" };
+    /// <summary>
+    /// Editor for the AudioOutput component
+    /// </summary>
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(AudioOutput))]
+    public class AudioOutputEditor : UnityEditor.Editor
+    {
+        private static readonly GUIContent _guiTextChannel = new GUIContent("Channel");
+        private static readonly GUIContent _guiTextChannels = new GUIContent("Channels");
+        private static readonly string[] _channelMaskOptions = { "1", "2", "3", "4", "5", "6", "7", "8" };
 
-		private SerializedProperty _propMediaPlayer;
-		private SerializedProperty _propAudioOutputMode;
-		private SerializedProperty _propSupportPositionalAudio;
-		private SerializedProperty _propChannelMask;
-		private int _unityAudioSampleRate;
-		private int _unityAudioSpeakerCount;
-		private string _bufferedMs;
+        private SerializedProperty _propMediaPlayer;
+        private SerializedProperty _propAudioOutputMode;
+        private SerializedProperty _propSupportPositionalAudio;
+        private SerializedProperty _propChannelMask;
+        private int _unityAudioSampleRate;
+        private int _unityAudioSpeakerCount;
+        private string _bufferedMs;
 
-		void OnEnable()
-		{
-			_propMediaPlayer = this.CheckFindProperty("_mediaPlayer");
-			_propAudioOutputMode = this.CheckFindProperty("_audioOutputMode");
-			_propSupportPositionalAudio = this.CheckFindProperty("_supportPositionalAudio");
-			_propChannelMask = this.CheckFindProperty("_channelMask");
-			_unityAudioSampleRate = Helper.GetUnityAudioSampleRate();
-			_unityAudioSpeakerCount = Helper.GetUnityAudioSpeakerCount();
-		}
+        void OnEnable()
+        {
+            _propMediaPlayer = this.CheckFindProperty("_mediaPlayer");
+            _propAudioOutputMode = this.CheckFindProperty("_audioOutputMode");
+            _propSupportPositionalAudio = this.CheckFindProperty("_supportPositionalAudio");
+            _propChannelMask = this.CheckFindProperty("_channelMask");
+            _unityAudioSampleRate = Helper.GetUnityAudioSampleRate();
+            _unityAudioSpeakerCount = Helper.GetUnityAudioSpeakerCount();
+        }
 
-		public override void OnInspectorGUI()
-		{
-			serializedObject.Update();
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
 
-			AudioOutput audioOutput = (AudioOutput)this.target;
+            AudioOutput audioOutput = (AudioOutput)this.target;
 
-			EditorGUILayout.PropertyField(_propMediaPlayer);
-			EditorGUILayout.PropertyField(_propAudioOutputMode);
-			EditorGUILayout.PropertyField(_propSupportPositionalAudio);
+            EditorGUILayout.PropertyField(_propMediaPlayer);
+            EditorGUILayout.PropertyField(_propAudioOutputMode);
+            EditorGUILayout.PropertyField(_propSupportPositionalAudio);
 
-			// Display the channel mask as either a bitfield or value slider
-			if ((AudioOutput.AudioOutputMode)_propAudioOutputMode.enumValueIndex == AudioOutput.AudioOutputMode.MultipleChannels)
-			{
-				_propChannelMask.intValue = EditorGUILayout.MaskField(_guiTextChannels, _propChannelMask.intValue, _channelMaskOptions);
-			}
-			else
-			{
-				int prevVal = 0;
-				for(int i = 0; i < 8; ++i)
-				{
-					if((_propChannelMask.intValue & (1 << i)) > 0)
-					{
-						prevVal = i;
-						break;
-					}
-				}
-				
-				int newVal = Mathf.Clamp(EditorGUILayout.IntSlider(_guiTextChannel, prevVal, 0, 7), 0, 7);
-				_propChannelMask.intValue = 1 << newVal;
-			}
+            // Display the channel mask as either a bitfield or value slider
+            if ((AudioOutput.AudioOutputMode)_propAudioOutputMode.enumValueIndex == AudioOutput.AudioOutputMode.MultipleChannels)
+            {
+                _propChannelMask.intValue = EditorGUILayout.MaskField(_guiTextChannels, _propChannelMask.intValue, _channelMaskOptions);
+            }
+            else
+            {
+                int prevVal = 0;
+                for (int i = 0; i < 8; ++i)
+                {
+                    if ((_propChannelMask.intValue & (1 << i)) > 0)
+                    {
+                        prevVal = i;
+                        break;
+                    }
+                }
 
-			GUILayout.Label("Unity Audio", EditorStyles.boldLabel);
-			EditorGUILayout.LabelField("Speakers", _unityAudioSpeakerCount.ToString());
-			EditorGUILayout.LabelField("Sample Rate", _unityAudioSampleRate.ToString() + "hz");
-			EditorGUILayout.Space();
+                int newVal = Mathf.Clamp(EditorGUILayout.IntSlider(_guiTextChannel, prevVal, 0, 7), 0, 7);
+                _propChannelMask.intValue = 1 << newVal;
+            }
 
-			if (audioOutput != null)
-			{
-				if (audioOutput.Player != null && audioOutput.Player.Control != null)
-				{
-					int channelCount = audioOutput.Player.Control.GetAudioChannelCount();
-					if (channelCount >= 0)
-					{
-						GUILayout.Label("Media Audio", EditorStyles.boldLabel);
-						EditorGUILayout.LabelField("Channels: " + channelCount);
-						AudioChannelMaskFlags audioChannels = audioOutput.Player.Control.GetAudioChannelMask();
-						GUILayout.Label(audioChannels.ToString(), EditorHelper.IMGUI.GetWordWrappedTextAreaStyle());
+            GUILayout.Label("Unity Audio", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Speakers", _unityAudioSpeakerCount.ToString());
+            EditorGUILayout.LabelField("Sample Rate", _unityAudioSampleRate.ToString() + "hz");
+            EditorGUILayout.Space();
 
-						if (Time.frameCount % 4 == 0)
-						{
-							int bufferedSampleCount = audioOutput.Player.Control.GetAudioBufferedSampleCount();
-							float bufferedMs = (bufferedSampleCount * 1000f) / (_unityAudioSampleRate * channelCount);
-							_bufferedMs = "Buffered: " + bufferedMs.ToString("F2") + "ms";
-						}
+            if (audioOutput != null)
+            {
+                if (audioOutput.Player != null && audioOutput.Player.Control != null)
+                {
+                    int channelCount = audioOutput.Player.Control.GetAudioChannelCount();
+                    if (channelCount >= 0)
+                    {
+                        GUILayout.Label("Media Audio", EditorStyles.boldLabel);
+                        EditorGUILayout.LabelField("Channels: " + channelCount);
+                        AudioChannelMaskFlags audioChannels = audioOutput.Player.Control.GetAudioChannelMask();
+                        GUILayout.Label(audioChannels.ToString(), EditorHelper.IMGUI.GetWordWrappedTextAreaStyle());
 
-						EditorGUILayout.LabelField(_bufferedMs);
-						EditorGUILayout.Space();
-					}
-				}
-			}
+                        if (Time.frameCount % 4 == 0)
+                        {
+                            int bufferedSampleCount = audioOutput.Player.Control.GetAudioBufferedSampleCount();
+                            float bufferedMs = (bufferedSampleCount * 1000f) / (_unityAudioSampleRate * channelCount);
+                            _bufferedMs = "Buffered: " + bufferedMs.ToString("F2") + "ms";
+                        }
 
-			serializedObject.ApplyModifiedProperties();
-		}
-	}
+                        EditorGUILayout.LabelField(_bufferedMs);
+                        EditorGUILayout.Space();
+                    }
+                }
+            }
+
+            serializedObject.ApplyModifiedProperties();
+        }
+    }
 }

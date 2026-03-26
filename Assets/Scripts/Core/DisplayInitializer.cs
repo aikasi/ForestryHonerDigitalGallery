@@ -8,6 +8,8 @@ public class DisplayInitializer : MonoBehaviour
 {
     private void Awake()
     {
+        Application.targetFrameRate = 60;
+        QualitySettings.vSyncCount = 0;
         InitializeDisplays();
     }
 
@@ -36,7 +38,7 @@ public class DisplayInitializer : MonoBehaviour
 
         // 런타임 백그라운드 실행 유지 (터치 중 포커스 상실로 인한 비디오 정지 원천 차단)
         Application.runInBackground = true;
-        
+
         // 마우스 커서 숨김 처리 (Settings.txt 설정값 기반)
         string hideCursorStr = CSVReader.GetStringValue("HideCursor", "true");
         bool hideCursor = true; // 기본값 true (키오스크 환경)
@@ -44,13 +46,13 @@ public class DisplayInitializer : MonoBehaviour
         {
             hideCursor = parsedHide;
         }
-        
+
         Cursor.visible = !hideCursor;
         if (hideCursor)
         {
             Cursor.lockState = CursorLockMode.Confined; // 커서를 창 내부로 가둠 (Locked는 중앙 고정이라 UI 입력과 충돌)
         }
-        
+
         Debug.Log($"[DisplayInitializer] Application.runInBackground=true, Cursor.visible={!hideCursor}");
     }
 }

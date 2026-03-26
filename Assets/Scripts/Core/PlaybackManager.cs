@@ -1,11 +1,11 @@
+using DG.Tweening;
+using RenderHeads.Media.AVProVideo;
 using System;
 using System.Collections;
 using UnityEngine;
-using RenderHeads.Media.AVProVideo;
-using DG.Tweening;
 
 /// <summary>
-/// 듀얼 핑퐁 버퍼 구조로 비디오 크로스페이드 재생을 담당하는 매니저 클래스 (Display 1 담당)
+/// 듀얼 버퍼 구조로 비디오 크로스페이드 재생을 담당하는 매니저 클래스 (Display 1 담당)
 /// </summary>
 public class PlaybackManager : MonoBehaviour
 {
@@ -34,10 +34,15 @@ public class PlaybackManager : MonoBehaviour
     public MediaPlayer ActiveMediaPlayer => activeBuffer;
     public Action<bool> OnTransitionComplete;
 
+    public int CurrentPlayingIndex { get; private set; } = -1;
+    public Action<bool, int> OnPlaybackStateChanged;
+
     private int idleVideoIndex;
     private float crossfadeDuration;
     private float loadTimeout;
     private bool showErrorOnLoadFail;
+
+    private bool IsIdleVideo(int index) => index == idleVideoIndex;
 
     private Coroutine timeoutCoroutine;
 
@@ -81,7 +86,7 @@ public class PlaybackManager : MonoBehaviour
         idleVideoIndex = CSVReader.GetIntValue("IdleVideoIndex", 0);
         crossfadeDuration = CSVReader.GetFloatValue("CrossfadeDuration", 0.5f);
         loadTimeout = CSVReader.GetFloatValue("LoadTimeout", 10f);
-        
+
         string showErrorStr = CSVReader.GetStringValue("ShowErrorOnLoadFail", "false");
         showErrorOnLoadFail = bool.TryParse(showErrorStr, out bool parsed) && parsed;
 
@@ -130,7 +135,7 @@ public class PlaybackManager : MonoBehaviour
         {
             currentlyLoadingIndex = idleVideoIndex;
             activeBuffer.OpenMedia(new MediaPath(mediaData.Value.AbsolutePath, MediaPathType.AbsolutePathOrURL), autoPlay: true);
-            
+
             // OpenMedia 호출 직후 Control이 null일 가능성을 대비해 루프 설정은 FirstFrameReady 이벤트에서도 보장해야 함
             if (activeBuffer.Control != null)
                 activeBuffer.Control.SetLooping(true);
@@ -147,11 +152,18 @@ public class PlaybackManager : MonoBehaviour
     public void TransitionTo(int index)
     {
         if (IsTransitioning) return;
+
+        if (CurrentPlayingIndex == index && !IsIdleVideo(index))
+        {
+            ReturnToIdle();
+            return;
+        }
+
         IsTransitioning = true;
         currentlyLoadingIndex = index;
 
         var mediaData = cacheManager.GetMediaData(index);
-        
+
         // 캐시 데이터가 없거나, 검증에 실패한 파일인 경우
         if (!mediaData.HasValue || !mediaData.Value.IsValid)
         {
@@ -162,10 +174,10 @@ public class PlaybackManager : MonoBehaviour
         // 대기 버퍼 설정 (루프 설정은 Control 널 가능성 때문에 안전하게 FirstFrameReady 등에서도 재확인)
         if (standbyBuffer.Control != null)
             standbyBuffer.Control.SetLooping(false); // 일반 영상은 루프 안함
-        
+
         // 비동기 로드 시작
         standbyBuffer.OpenMedia(new MediaPath(mediaData.Value.AbsolutePath, MediaPathType.AbsolutePathOrURL), autoPlay: false);
-        
+
         // 타임아웃 감시 시작
         if (timeoutCoroutine != null) StopCoroutine(timeoutCoroutine);
         timeoutCoroutine = StartCoroutine(LoadTimeoutRoutine(index));
@@ -174,7 +186,7 @@ public class PlaybackManager : MonoBehaviour
     private IEnumerator LoadTimeoutRoutine(int index)
     {
         yield return new WaitForSeconds(loadTimeout);
-        
+
         // 타임아웃 발생 시
         HandleLoadFailure($"영상 {index:D2}번 로드 타임아웃 ({loadTimeout}초)");
     }
@@ -190,7 +202,7 @@ public class PlaybackManager : MonoBehaviour
                 mp.Control.SetLooping(currentlyLoadingIndex == idleVideoIndex);
                 mp.Control.MuteAudio(videoMute); // 음소거 재적용
             }
-            
+
             if (IsTransitioning)
             {
                 if (timeoutCoroutine != null)
@@ -198,18 +210,18 @@ public class PlaybackManager : MonoBehaviour
                     StopCoroutine(timeoutCoroutine);
                     timeoutCoroutine = null;
                 }
-                
+
                 ExecuteCrossfade();
             }
         }
         // 활성 버퍼 영상 준비 완료 (초기화 시 대기 영상용 대응)
         else if (mp == activeBuffer && eventType == MediaPlayerEvent.EventType.FirstFrameReady)
         {
-             if (mp.Control != null)
-             {
-                 mp.Control.SetLooping(currentlyLoadingIndex == idleVideoIndex);
-                 mp.Control.MuteAudio(videoMute); // 음소거 재적용
-             }
+            if (mp.Control != null)
+            {
+                mp.Control.SetLooping(currentlyLoadingIndex == idleVideoIndex);
+                mp.Control.MuteAudio(videoMute); // 음소거 재적용
+            }
         }
         // 2. 비동기 로드 에러
         else if (mp == standbyBuffer && eventType == MediaPlayerEvent.EventType.Error)
@@ -233,6 +245,16 @@ public class PlaybackManager : MonoBehaviour
                 ReturnToIdle();
             }
         }
+        // 4. 대기 복귀 완료 (Idle 상태로 돌아옴)
+        else if (mp == activeBuffer && eventType == MediaPlayerEvent.EventType.FirstFrameReady && IsIdleVideo(currentlyLoadingIndex))
+        {
+            // 이미 대기 상태로 복귀된 경우에만 이벤트 발생
+            if (CurrentPlayingIndex != -1)
+            {
+                CurrentPlayingIndex = -1;
+                OnPlaybackStateChanged?.Invoke(false, -1);
+            }
+        }
     }
 
     private void ExecuteCrossfade()
@@ -249,7 +271,7 @@ public class PlaybackManager : MonoBehaviour
         {
             // 전환 완료 시점
             activeBuffer.CloseMedia(); // 이전 메모리 해제
-            
+
             // 포인터 스왑
             var tempBuffer = activeBuffer;
             activeBuffer = standbyBuffer;
@@ -258,6 +280,11 @@ public class PlaybackManager : MonoBehaviour
             var tempCanvas = activeCanvas;
             activeCanvas = standbyCanvas;
             standbyCanvas = tempCanvas;
+
+            // 현재 재생 인덱스 업데이트 및 이벤트 발생
+            bool isIdle = IsIdleVideo(currentlyLoadingIndex);
+            CurrentPlayingIndex = isIdle ? -1 : currentlyLoadingIndex;
+            OnPlaybackStateChanged?.Invoke(!isIdle, CurrentPlayingIndex);
 
             IsTransitioning = false;
             OnTransitionComplete?.Invoke(true);
@@ -270,7 +297,7 @@ public class PlaybackManager : MonoBehaviour
     private void HandleLoadFailure(string msg)
     {
         if (logger != null) logger.Enqueue($"[PlaybackManager] 로드 실패: {msg}");
-        
+
         standbyBuffer.CloseMedia();
 
         IsTransitioning = false;
@@ -280,7 +307,7 @@ public class PlaybackManager : MonoBehaviour
         {
             // 00번 로드 자체가 실패했다면 다시 복귀 요청 시도하는 무한 루프 차단
             bool isIdleVideoFail = (currentlyLoadingIndex == idleVideoIndex);
-            
+
             errorUI.OnDismissed -= OnErrorUIDismissed;
             errorUI.OnDismissed += OnErrorUIDismissed;
             errorUI.Show($"로드 실패:\n{msg}" + (isIdleVideoFail ? "\n\n(시스템 복구 불가 상태. 관리자 문의 요망)" : ""));
@@ -293,14 +320,14 @@ public class PlaybackManager : MonoBehaviour
                 if (logger != null) logger.Enqueue("[PlaybackManager] 심각한 오류: 대기 영상(00번) 로드 실패. 앱이 정상 작동하지 않을 수 있습니다.");
                 return;
             }
-            ReturnToIdle(); 
+            ReturnToIdle();
         }
     }
 
     private void OnErrorUIDismissed()
     {
         if (errorUI != null) errorUI.OnDismissed -= OnErrorUIDismissed;
-        
+
         if (currentlyLoadingIndex == idleVideoIndex)
         {
             if (logger != null) logger.Enqueue("[PlaybackManager] 대기 영상 복구 실패 상태이므로 복귀를 포기합니다.");
@@ -311,25 +338,25 @@ public class PlaybackManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 대기 영상(00.mp4)으로 크로스페이드 복귀
+    /// 대기 영상(00)으로 크로스페이드 복귀
     /// </summary>
     public void ReturnToIdle(bool force = false)
     {
         if (IsTransitioning) return;
-        
+
         // 이미 00번 재생 중이고 루프 상태면 무시 (단, 강제 리셋 요청 시 방어 로직 무시)
         if (!force && activeBuffer.Control != null && activeBuffer.Control.IsLooping()) return;
 
         IsTransitioning = true;
         currentlyLoadingIndex = idleVideoIndex;
-        
+
         var mediaData = cacheManager.GetMediaData(idleVideoIndex);
         if (mediaData.HasValue && mediaData.Value.IsValid)
         {
             if (standbyBuffer.Control != null)
                 standbyBuffer.Control.SetLooping(true);
             standbyBuffer.OpenMedia(new MediaPath(mediaData.Value.AbsolutePath, MediaPathType.AbsolutePathOrURL), autoPlay: false);
-            
+
             if (timeoutCoroutine != null) StopCoroutine(timeoutCoroutine);
             timeoutCoroutine = StartCoroutine(LoadTimeoutRoutine(idleVideoIndex));
         }
@@ -345,18 +372,18 @@ public class PlaybackManager : MonoBehaviour
     public void ForceResetToIdle()
     {
         if (logger != null) logger.Enqueue("[PlaybackManager] 영상 강제 리셋 (ForceResetToIdle) 요청됨.");
-        
+
         // 기존 진행 중인 트랜지션 강제 취소
         if (IsTransitioning)
         {
             if (timeoutCoroutine != null) StopCoroutine(timeoutCoroutine);
             activeCanvas.DOKill();
             standbyCanvas.DOKill();
-            
+
             // 트랜지션 취소 시 알파값 엉킴 방지
             activeCanvas.alpha = 1f;
             standbyCanvas.alpha = 0f;
-            
+
             standbyBuffer.CloseMedia();
             IsTransitioning = false;
             OnTransitionComplete?.Invoke(false);

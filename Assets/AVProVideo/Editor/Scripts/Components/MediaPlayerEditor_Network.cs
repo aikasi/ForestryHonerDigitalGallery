@@ -1,5 +1,5 @@
-﻿using UnityEngine;
-using UnityEditor;
+﻿using UnityEditor;
+using UnityEngine;
 
 //-----------------------------------------------------------------------------
 // Copyright 2015-2021 RenderHeads Ltd.  All rights reserved.
@@ -7,124 +7,124 @@ using UnityEditor;
 
 namespace RenderHeads.Media.AVProVideo.Editor
 {
-	/// <summary>
-	/// Editor for the MediaPlayer component
-	/// </summary>
-	public partial class MediaPlayerEditor : UnityEditor.Editor
-	{
-		private void OnInspectorGUI_Network()
-		{
-			if (_showUltraOptions)
-			{
-				SerializedProperty httpHeadersProp = serializedObject.FindProperty("_httpHeaders.httpHeaders");
-				OnInspectorGUI_HttpHeaders(httpHeadersProp);
+    /// <summary>
+    /// Editor for the MediaPlayer component
+    /// </summary>
+    public partial class MediaPlayerEditor : UnityEditor.Editor
+    {
+        private void OnInspectorGUI_Network()
+        {
+            if (_showUltraOptions)
+            {
+                SerializedProperty httpHeadersProp = serializedObject.FindProperty("_httpHeaders.httpHeaders");
+                OnInspectorGUI_HttpHeaders(httpHeadersProp);
 
-				SerializedProperty keyAuthProp = serializedObject.FindProperty("_keyAuth");
-				OnInspectorGUI_HlsDecryption(keyAuthProp);
-			}
-		}
+                SerializedProperty keyAuthProp = serializedObject.FindProperty("_keyAuth");
+                OnInspectorGUI_HlsDecryption(keyAuthProp);
+            }
+        }
 
-		private void OnInspectorGUI_HlsDecryption(SerializedProperty keyAuthProp)
-		{
-			if (keyAuthProp == null) return;
+        private void OnInspectorGUI_HlsDecryption(SerializedProperty keyAuthProp)
+        {
+            if (keyAuthProp == null) return;
 
-			EditorGUILayout.BeginVertical(GUI.skin.box);
-			GUILayout.Label("HLS Decryption", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("HLS Decryption", EditorStyles.boldLabel);
 
-			// Key server auth token
-			SerializedProperty prop = keyAuthProp.FindPropertyRelative("keyServerToken");
-			if (prop != null)
-			{
-				EditorGUILayout.PropertyField(prop, new GUIContent("Auth Token", "Token to pass to the key server in the 'Authorization' HTTP header field"));
-			}
+            // Key server auth token
+            SerializedProperty prop = keyAuthProp.FindPropertyRelative("keyServerToken");
+            if (prop != null)
+            {
+                EditorGUILayout.PropertyField(prop, new GUIContent("Auth Token", "Token to pass to the key server in the 'Authorization' HTTP header field"));
+            }
 
-			//GUILayout.Label("Overrides");
-			//EditorGUI.indentLevel++;
+            //GUILayout.Label("Overrides");
+            //EditorGUI.indentLevel++;
 
-			// Key server override
-			/*prop = serializedObject.FindProperty(optionsVarName + ".keyServerURLOverride");
+            // Key server override
+            /*prop = serializedObject.FindProperty(optionsVarName + ".keyServerURLOverride");
 			if (prop != null)
 			{
 				EditorGUILayout.PropertyField(prop, new GUIContent("Key Server URL", "Overrides the key server URL if present in a HLS manifest."));
 			}*/
-			
-			// Key data blob override
-			prop = keyAuthProp.FindPropertyRelative("overrideDecryptionKeyBase64");
-			if (prop != null)
-			{
-				EditorGUILayout.PropertyField(prop, new GUIContent("Key Override (Base64)", "Override key to use for decoding encrypted HLS streams (in Base64 format)."));
-			}
 
-			//EditorGUI.indentLevel--;
+            // Key data blob override
+            prop = keyAuthProp.FindPropertyRelative("overrideDecryptionKeyBase64");
+            if (prop != null)
+            {
+                EditorGUILayout.PropertyField(prop, new GUIContent("Key Override (Base64)", "Override key to use for decoding encrypted HLS streams (in Base64 format)."));
+            }
 
-			EditorGUILayout.EndVertical();
-		}
+            //EditorGUI.indentLevel--;
 
-		private void OnInspectorGUI_HttpHeaders(SerializedProperty httpHeadersProp)
-		{
-			if (httpHeadersProp ==  null) return;
-			
-			//GUILayout.Space(8f);
-			bool isExpanded = _HTTPHeadersToggle;
-			if (isExpanded)
-			{
-				EditorGUILayout.BeginVertical(GUI.skin.box);
-			}
-			bool hasHeaders = (httpHeadersProp.arraySize > 0);
-			Color tintColor = hasHeaders?Color.yellow:Color.white;
-			if (AnimCollapseSection.BeginShow("Custom HTTP Headers", ref _HTTPHeadersToggle, tintColor))
-			{
-				{
-					if (httpHeadersProp.arraySize > 0)
-					{
-						int deleteIndex = -1;
-						for (int i = 0; i < httpHeadersProp.arraySize; ++i)
-						{
-							SerializedProperty httpHeaderProp = httpHeadersProp.GetArrayElementAtIndex(i);
-							SerializedProperty headerProp = httpHeaderProp.FindPropertyRelative("name");
+            EditorGUILayout.EndVertical();
+        }
 
-							GUILayout.BeginVertical(GUI.skin.box);
-							GUILayout.BeginHorizontal();
+        private void OnInspectorGUI_HttpHeaders(SerializedProperty httpHeadersProp)
+        {
+            if (httpHeadersProp == null) return;
 
-							GUI.color = HttpHeader.IsValid(headerProp.stringValue)?Color.white:Color.red;
-							EditorGUILayout.PropertyField(headerProp, GUIContent.none);
-							headerProp.stringValue = headerProp.stringValue.Trim();
-							GUI.color = Color.white;
+            //GUILayout.Space(8f);
+            bool isExpanded = _HTTPHeadersToggle;
+            if (isExpanded)
+            {
+                EditorGUILayout.BeginVertical(GUI.skin.box);
+            }
+            bool hasHeaders = (httpHeadersProp.arraySize > 0);
+            Color tintColor = hasHeaders ? Color.yellow : Color.white;
+            if (AnimCollapseSection.BeginShow("Custom HTTP Headers", ref _HTTPHeadersToggle, tintColor))
+            {
+                {
+                    if (httpHeadersProp.arraySize > 0)
+                    {
+                        int deleteIndex = -1;
+                        for (int i = 0; i < httpHeadersProp.arraySize; ++i)
+                        {
+                            SerializedProperty httpHeaderProp = httpHeadersProp.GetArrayElementAtIndex(i);
+                            SerializedProperty headerProp = httpHeaderProp.FindPropertyRelative("name");
 
-							if (GUILayout.Button("-", GUILayout.ExpandWidth(false)))
-							{
-								deleteIndex = i;
-							}
-							GUILayout.EndHorizontal();
+                            GUILayout.BeginVertical(GUI.skin.box);
+                            GUILayout.BeginHorizontal();
 
-							SerializedProperty valueProp = httpHeaderProp.FindPropertyRelative("value");
-							GUI.color = HttpHeader.IsValid(valueProp.stringValue)?Color.white:Color.red;
-							valueProp.stringValue = EditorGUILayout.TextArea(valueProp.stringValue, EditorHelper.IMGUI.GetWordWrappedTextAreaStyle());
-							GUI.color = Color.white;
-							valueProp.stringValue = valueProp.stringValue.Trim();
-							GUILayout.EndVertical();
-							GUILayout.Space(4f);
-						}
+                            GUI.color = HttpHeader.IsValid(headerProp.stringValue) ? Color.white : Color.red;
+                            EditorGUILayout.PropertyField(headerProp, GUIContent.none);
+                            headerProp.stringValue = headerProp.stringValue.Trim();
+                            GUI.color = Color.white;
 
-						if (deleteIndex >= 0)
-						{
-							httpHeadersProp.DeleteArrayElementAtIndex(deleteIndex);
-						}
-					}
-					if (GUILayout.Button("+"))
-					{
-						httpHeadersProp.InsertArrayElementAtIndex(httpHeadersProp.arraySize);
-					}
-				}
-			}
-			AnimCollapseSection.EndShow();
+                            if (GUILayout.Button("-", GUILayout.ExpandWidth(false)))
+                            {
+                                deleteIndex = i;
+                            }
+                            GUILayout.EndHorizontal();
 
-			if (isExpanded)
-			{
-				EditorGUILayout.EndVertical();
-			}
-			
-			//GUILayout.Space(8f);
-		}
-	}
+                            SerializedProperty valueProp = httpHeaderProp.FindPropertyRelative("value");
+                            GUI.color = HttpHeader.IsValid(valueProp.stringValue) ? Color.white : Color.red;
+                            valueProp.stringValue = EditorGUILayout.TextArea(valueProp.stringValue, EditorHelper.IMGUI.GetWordWrappedTextAreaStyle());
+                            GUI.color = Color.white;
+                            valueProp.stringValue = valueProp.stringValue.Trim();
+                            GUILayout.EndVertical();
+                            GUILayout.Space(4f);
+                        }
+
+                        if (deleteIndex >= 0)
+                        {
+                            httpHeadersProp.DeleteArrayElementAtIndex(deleteIndex);
+                        }
+                    }
+                    if (GUILayout.Button("+"))
+                    {
+                        httpHeadersProp.InsertArrayElementAtIndex(httpHeadersProp.arraySize);
+                    }
+                }
+            }
+            AnimCollapseSection.EndShow();
+
+            if (isExpanded)
+            {
+                EditorGUILayout.EndVertical();
+            }
+
+            //GUILayout.Space(8f);
+        }
+    }
 }

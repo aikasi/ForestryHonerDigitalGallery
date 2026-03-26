@@ -4,80 +4,80 @@
 
 namespace RenderHeads.Media.AVProVideo
 {
-	public interface ITimedMetadata
-	{
-		bool HasNewTimedMetadataItem();
+    public interface ITimedMetadata
+    {
+        bool HasNewTimedMetadataItem();
 
-		TimedMetadataItem GetTimedMetadataItem();
-	}
+        TimedMetadataItem GetTimedMetadataItem();
+    }
 
-	public class TimedMetadataItem
-	{
-		public double PresentationTime
-		{
-			get
-			{
-				return _presentationTime;
-			}
-		}
+    public class TimedMetadataItem
+    {
+        public double PresentationTime
+        {
+            get
+            {
+                return _presentationTime;
+            }
+        }
 
-		public string Text
-		{
-			get
-			{
-				return _text;
-			}
-		}
+        public string Text
+        {
+            get
+            {
+                return _text;
+            }
+        }
 
-		internal TimedMetadataItem(double presentationTime, string text)
-		{
-			_presentationTime = presentationTime;
-			_text = text;
-		}
+        internal TimedMetadataItem(double presentationTime, string text)
+        {
+            _presentationTime = presentationTime;
+            _text = text;
+        }
 
-		private TimedMetadataItem()
-		{
+        private TimedMetadataItem()
+        {
 
-		}
+        }
 
-		private double _presentationTime;
-		private string _text;
-	}
+        private double _presentationTime;
+        private string _text;
+    }
 
-	public partial class BaseMediaPlayer : ITimedMetadata
-	{
-		public bool HasNewTimedMetadataItem()
-		{
-			return _hasNewTimedMetadataItem;
-		}
+    public partial class BaseMediaPlayer : ITimedMetadata
+    {
+        public bool HasNewTimedMetadataItem()
+        {
+            return _hasNewTimedMetadataItem;
+        }
 
-		public TimedMetadataItem GetTimedMetadataItem()
-		{
-			_hasNewTimedMetadataItem = false;
-			return _timedMetadataItem;
-		}
+        public TimedMetadataItem GetTimedMetadataItem()
+        {
+            _hasNewTimedMetadataItem = false;
+            return _timedMetadataItem;
+        }
 
-		protected void UpdateTimedMetadata()
-		{
-			var hasUpdatedTimedMetadata = InternalHasUpdatedTimedMetadata();
-			if (hasUpdatedTimedMetadata)
-			{
-				_timedMetadataItem = InternalGetTimedMetadataItem();
-				_hasNewTimedMetadataItem = true;
-			}
-		}
+        protected void UpdateTimedMetadata()
+        {
+            var hasUpdatedTimedMetadata = InternalHasUpdatedTimedMetadata();
+            if (hasUpdatedTimedMetadata)
+            {
+                _timedMetadataItem = InternalGetTimedMetadataItem();
+                _hasNewTimedMetadataItem = true;
+            }
+        }
 
-		protected virtual bool InternalHasUpdatedTimedMetadata()
-		{
-			return false;
-		}
+        protected virtual bool InternalHasUpdatedTimedMetadata()
+        {
+            return false;
+        }
 
-		protected virtual TimedMetadataItem InternalGetTimedMetadataItem()
-		{
-			return null;
-		}
+        protected virtual TimedMetadataItem InternalGetTimedMetadataItem()
+        {
+            return null;
+        }
 
-		private TimedMetadataItem _timedMetadataItem = null;
-		private bool _hasNewTimedMetadataItem = false;
-	}
+        private TimedMetadataItem _timedMetadataItem = null;
+        private bool _hasNewTimedMetadataItem = false;
+    }
 }

@@ -1,7 +1,4 @@
-using System;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.UIElements;
 using UnityEngine.Video;
 
 //-----------------------------------------------------------------------------
@@ -59,7 +56,9 @@ namespace RenderHeads.Media.AVProVideo
         public Camera Camera
         {
             get { return _camera; }
-            set { _camera = value; if (!_material) CreateMaterial(); _material.SetFloat("_TargetCamID", value.GetInstanceID());
+            set
+            {
+                _camera = value; if (!_material) CreateMaterial(); _material.SetFloat("_TargetCamID", value.GetInstanceID());
             }
         }
         [Tooltip("The aspect ratio of the video shown, not used when a custom scaling is set")]
@@ -73,7 +72,7 @@ namespace RenderHeads.Media.AVProVideo
         public Vector2 _drawOffset;
         public Vector2 DrawOffset
         {
-            get { return  _drawOffset; }
+            get { return _drawOffset; }
             set { if (!_material) CreateMaterial(); _material.SetVector("_DrawOffset", value); _drawOffset = value; }
         }
         [Tooltip("Will replace the Aspect Ratio with custom scaling for the video, when both values are non-zero")]
@@ -264,7 +263,7 @@ namespace RenderHeads.Media.AVProVideo
 
         private Texture _lastTextureApplied;
         private LazyShaderProperty _propTexture;
-        private LazyShaderProperty _propTexture_R; 
+        private LazyShaderProperty _propTexture_R;
 
         private Texture _originalTexture;
         private Vector2 _originalScale = Vector2.one;
@@ -330,7 +329,7 @@ namespace RenderHeads.Media.AVProVideo
             switch (target)
             {
                 case 0:
-                    _material.SetColor("_Color", _mainColor); 
+                    _material.SetColor("_Color", _mainColor);
                     break;
                 case 3:
                     _material.SetTexture("_MainTex", _texture);

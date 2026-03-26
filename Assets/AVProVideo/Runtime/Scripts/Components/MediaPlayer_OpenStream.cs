@@ -9,8 +9,8 @@ using Windows.Storage.Streams;
 
 namespace RenderHeads.Media.AVProVideo
 {
-	public partial class MediaPlayer : MonoBehaviour
-	{
+    public partial class MediaPlayer : MonoBehaviour
+    {
 
 #if NETFX_CORE
 		public bool OpenVideoFromStream(IRandomAccessStream ras, string path, bool autoPlay = true)
@@ -56,5 +56,5 @@ namespace RenderHeads.Media.AVProVideo
 			return result;
 		}
 #endif
-	}
+    }
 }

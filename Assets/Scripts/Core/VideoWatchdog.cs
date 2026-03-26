@@ -1,5 +1,5 @@
-using UnityEngine;
 using RenderHeads.Media.AVProVideo;
+using UnityEngine;
 
 /// <summary>
 /// AVPro MediaPlayer의 프레임 정지(프리징) 현상을 감지하고 자가 복구를 수행하는 Watchdog 클래스
@@ -8,11 +8,11 @@ public class VideoWatchdog : MonoBehaviour
 {
     [SerializeField] private PlaybackManager playbackManager;
     [SerializeField] private Logger logger;
-    
+
     [Header("Debug")]
     [Tooltip("에디터 실행 중 체크하면 강제로 프레임이 멈춘 것처럼 시뮬레이션합니다.")]
     [SerializeField] private bool simulateFreeze = false;
-    
+
     // WatchdogInterval (기본 1.0초)마다 검사
     private float checkInterval = 1.0f;
     private float stallThreshold = 2.0f;
@@ -21,7 +21,7 @@ public class VideoWatchdog : MonoBehaviour
     private float timer = 0f;
     private float stallTimer = 0f;
     private int lastFrameCount = 0;
-    
+
     private int currentRetryCount = 0;
 
     private void Start()
@@ -103,7 +103,7 @@ public class VideoWatchdog : MonoBehaviour
         {
             string msg = $"[VideoWatchdog] 비디오 정지 감지. 재생 복구 시도 ({currentRetryCount}/{maxRetryCount})";
             if (logger != null) logger.Enqueue(msg);
-            
+
             // 2단계: Play() 재호출 시도
             if (activePlayer.Control != null)
             {
@@ -127,7 +127,7 @@ public class VideoWatchdog : MonoBehaviour
     {
         stallTimer = 0f;
         currentRetryCount = 0;
-        
+
         if (playbackManager != null && playbackManager.ActiveMediaPlayer != null && playbackManager.ActiveMediaPlayer.TextureProducer != null)
         {
             lastFrameCount = playbackManager.ActiveMediaPlayer.TextureProducer.GetTextureFrameCount();

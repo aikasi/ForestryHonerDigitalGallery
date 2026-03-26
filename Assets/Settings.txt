@@ -8,7 +8,7 @@ ShowErrorOnLoadFail, false, 로드 실패 시 UI에 에러 표시 여부 (false=
 WatchdogRetryCount, 3, Watchdog 재시도 횟수
 WatchdogStallThreshold, 2.0, 프레임 정지 감지 임계값(초)
 IdleVideoIndex, 0, 대기 영상 인덱스
-HideCursor, true, 마우스 커서 숨김 및 잠금 여부 (true/false)
+HideCursor, false, 마우스 커서 숨김 및 잠금 여부 (true/false)
 VideoMute, false, 음소거 여부 (true/false)
 VideoScaleMode, StretchToFill, 화면 맞춤 모드 (StretchToFill / ScaleToFit / ScaleToFill)
 SupportedExtensions, .mp4;.mov;.webm;.mkv;.avi, 지원할 비디오 확장자 목록 (; 기호로 구분)

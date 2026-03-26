@@ -7,9 +7,9 @@ using UnityEngine;
 
 namespace RenderHeads.Media.AVProVideo
 {
-	public partial class MediaPlayer : MonoBehaviour
-	{
-#region Application Focus and Pausing
+    public partial class MediaPlayer : MonoBehaviour
+    {
+        #region Application Focus and Pausing
 #if !UNITY_EDITOR
 		void OnApplicationFocus(bool focusStatus)
 		{
@@ -59,7 +59,7 @@ namespace RenderHeads.Media.AVProVideo
 #endif
 		}
 #endif
-#endregion // Application Focus and Pausing
-	}
+        #endregion // Application Focus and Pausing
+    }
 }
 #endif

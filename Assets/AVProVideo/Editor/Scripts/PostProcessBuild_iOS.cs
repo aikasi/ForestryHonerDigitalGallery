@@ -212,10 +212,10 @@ namespace RenderHeads.Media.AVProVideo.Editor
 				case BuildTarget.iOS:
 				case BuildTarget.tvOS:
 					return "Unity-iPhone.xcodeproj";
-			#if UNITY_SUPPORTS_VISIONOS
+#if UNITY_SUPPORTS_VISIONOS
 				case BuildTarget.VisionOS:
 					return "Unity-VisionOS.xcodeproj";
-			#endif
+#endif
 				default:
 					Debug.LogError($"[AVProVideo] GetXcodeProjectNameForBuildTarget - unrecognised build target: {target}");
 					return null;
@@ -269,18 +269,18 @@ namespace RenderHeads.Media.AVProVideo.Editor
 			// Unity just copies the xcframework into the frameworks folder
 			string frameworkPath = Path.Combine(subFolder, components[^1]);
 #else
-	#if UNITY_VISIONOS
+#if UNITY_VISIONOS
 			// For reasons unknown unity puts everything under an ARM64 folder on visionOS
 			components.Insert(0, "ARM64");
 			components.Insert(0, subFolder);
-	#else
+#else
 			components[0] = subFolder;
-	#endif
-	#if UNITY_2019_1_OR_NEWER
+#endif
+#if UNITY_2019_1_OR_NEWER
 				string frameworkPath = string.Join("/", components);
-	#else
+#else
 				string frameworkPath = string.Join("/", components.ToArray());
-	#endif
+#endif
 #endif
 			return frameworkPath;
 		}
@@ -401,14 +401,14 @@ namespace RenderHeads.Media.AVProVideo.Editor
 			}
 #endif
 
-		#if !UNITY_2022_1_OR_NEWER
+#if !UNITY_2022_1_OR_NEWER
 			// No longer required as we directly pull in the necessary symbols in PlatformMediaPlayer.Native
 			Debug.Log("[AVProVideo] Writing AVProVideoBootstrap.m to the UnityFramework target");
 			string bootstrapPath = Path.Combine(destPluginPath, "AVProVideoBootstrap.m");
 			File.WriteAllText(Path.Combine(path, bootstrapPath), AVProVideoBootstrap);
 			string bootstrapGuid = project.AddFile(bootstrapPath, bootstrapPath);
 			project.AddFileToBuild(unityFrameworkTargetGuid, bootstrapGuid);
-		#endif
+#endif
 
 			string forceSwiftPath = Path.Combine(destPluginPath, "AVProVideoForceSwift.swift");
 			Debug.Log("[AVProVideo] Writing AVProVideoForceSwift.swift to the UnityFramework target");

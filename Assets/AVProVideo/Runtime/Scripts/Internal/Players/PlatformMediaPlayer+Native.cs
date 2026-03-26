@@ -575,17 +575,17 @@ namespace RenderHeads.Media.AVProVideo
 			}
 
 #if AVPRO_VIDEO_PLATFORMMEDIAPLAYER_IPHONE
-	#if UNITY_2022_1_OR_NEWER
+#if UNITY_2022_1_OR_NEWER
 			[DllImport(PluginName)]
 			internal static extern void AVPUnityRegisterPlugin(IntPtr fn);
 
 			delegate void UnityRegisterPluginDelegate(IntPtr loadFn, IntPtr unloadFn);
 
-		#if UNITY_6000_0_OR_NEWER
+#if UNITY_6000_0_OR_NEWER
 			private const string UnityRegisterPluginEntryPoint = "UnityRegisterPlugin";
-		#else
+#else
 			private const string UnityRegisterPluginEntryPoint = "UnityRegisterRenderingPluginV5";
-		#endif
+#endif
 
 			[DllImport(PluginName, EntryPoint = UnityRegisterPluginEntryPoint)]
 			[AOT.MonoPInvokeCallback(typeof(UnityRegisterPluginDelegate))]
@@ -597,10 +597,10 @@ namespace RenderHeads.Media.AVProVideo
 				IntPtr pFn = Marshal.GetFunctionPointerForDelegate(unityRegisterPluginDelegate);
 				AVPUnityRegisterPlugin(pFn);
 			}
-	#else
+#else
 			[DllImport(PluginName)]
 			internal static extern void AVPPluginBootstrap();
-	#endif
+#endif
 #elif AVPRO_VIDEO_PLATFORMMEDIAPLAYER_ANDROID
 			internal static void AVPPluginBootstrap()
 			{

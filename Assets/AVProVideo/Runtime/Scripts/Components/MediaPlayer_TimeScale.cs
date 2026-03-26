@@ -6,10 +6,10 @@
 
 namespace RenderHeads.Media.AVProVideo
 {
-	public partial class MediaPlayer : MonoBehaviour
-	{
+    public partial class MediaPlayer : MonoBehaviour
+    {
 
-#region Support for Time Scale
+        #region Support for Time Scale
 #if AVPROVIDEO_BETA_SUPPORT_TIMESCALE
 		// Adjust this value to get faster performance but may drop frames.
 		// Wait longer to ensure there is enough time for frames to process
@@ -88,6 +88,6 @@ namespace RenderHeads.Media.AVProVideo
 			}
 		}
 #endif
-#endregion // Support for Time Scale
-	}
+        #endregion // Support for Time Scale
+    }
 }

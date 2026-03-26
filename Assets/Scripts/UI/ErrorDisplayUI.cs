@@ -11,10 +11,10 @@ public class ErrorDisplayUI : MonoBehaviour
 {
     [Tooltip("에러 메시지를 표시할 UI 패널 (검정 반투명 배경 등)")]
     [SerializeField] private GameObject errorPanel;
-    
+
     [Tooltip("실제 에러 내용이 출력될 Text")]
     [SerializeField] private TextMeshProUGUI errorText;
-    
+
     [Tooltip("화면 전체를 덮는 투명/반투명 버튼 (클릭 시 닫힘 처리용)")]
     [SerializeField] private Button backgroundDismissButton;
 

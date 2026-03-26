@@ -88,7 +88,7 @@ public class MediaCacheManager : MonoBehaviour
                 string msg = $" 파일 누락: {i:D2} 번호의 영상을 하나라도 찾을 수 없습니다. 지원 확장자: {string.Join(", ", SupportedExtensions)} 파일을 추가해주세요.";
                 if (logger != null) logger.Enqueue(msg);
                 errorMessages.Add(msg);
-                
+
                 // 앱이 크래시 나지 않도록 임시 기본값 연결 (에러 UI가 방어함)
                 absolutePath = Path.Combine(streamingAssetsPath, $"{i:D2}.mp4");
             }

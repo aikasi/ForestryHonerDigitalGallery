@@ -1,9 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
-
-namespace RenderHeads.Media.AVProVideo.Editor
+﻿namespace RenderHeads.Media.AVProVideo.Editor
 {
 #if AVPRO_FEATURE_VIDEORESOLVE
 	[CustomPropertyDrawer(typeof(VideoResolveOptions))]
