@@ -3,6 +3,7 @@ using RenderHeads.Media.AVProVideo;
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// 듀얼 버퍼 구조로 비디오 크로스페이드 재생을 담당하는 매니저 클래스 (Display 1 담당)
@@ -11,21 +12,25 @@ public class PlaybackManager : MonoBehaviour
 {
     [Header("AVPro Media Players")]
     [SerializeField] private MediaPlayer bufferA;
+
     [SerializeField] private MediaPlayer bufferB;
 
     [Header("UI Canvas Groups")]
     [SerializeField] private CanvasGroup canvasA;
+
     [SerializeField] private CanvasGroup canvasB;
     [SerializeField] private UnityEngine.UI.Graphic displayUguiA; // AVPro DisplayUGUI는 Graphic을 상속함
     [SerializeField] private UnityEngine.UI.Graphic displayUguiB;
 
     [Header("Dependencies")]
     [SerializeField] private MediaCacheManager cacheManager;
+
     [SerializeField] private Logger logger;
     [SerializeField] private ErrorDisplayUI errorUI;
 
     // 현재/대기 버퍼 포인터
     private MediaPlayer activeBuffer;
+
     private MediaPlayer standbyBuffer;
     private CanvasGroup activeCanvas;
     private CanvasGroup standbyCanvas;
@@ -34,7 +39,18 @@ public class PlaybackManager : MonoBehaviour
     public MediaPlayer ActiveMediaPlayer => activeBuffer;
     public Action<bool> OnTransitionComplete;
 
-    public int CurrentPlayingIndex { get; private set; } = -1;
+    public int CurrentPlayingIndex
+    {
+        get => _currentPlayingIndex; private set
+        {
+            if (_currentPlayingIndex != value) onPlayingChanged?.Invoke(value);
+            _currentPlayingIndex = value;
+        }
+    }
+
+    private int _currentPlayingIndex = -1;
+    public UnityEvent<int> onPlayingChanged;
+
     public Action<bool, int> OnPlaybackStateChanged;
 
     private int idleVideoIndex;
@@ -51,6 +67,7 @@ public class PlaybackManager : MonoBehaviour
 
     // 음소거 관련
     private bool videoMute;
+
     // 화면 맞춤 관련
     private ScaleMode videoScaleMode = ScaleMode.StretchToFill;
 
@@ -155,12 +172,14 @@ public class PlaybackManager : MonoBehaviour
 
         if (CurrentPlayingIndex == index && !IsIdleVideo(index))
         {
+            onPlayingChanged?.Invoke(-1);
             ReturnToIdle();
             return;
         }
 
         IsTransitioning = true;
         currentlyLoadingIndex = index;
+        onPlayingChanged?.Invoke(index);
 
         var mediaData = cacheManager.GetMediaData(index);
 

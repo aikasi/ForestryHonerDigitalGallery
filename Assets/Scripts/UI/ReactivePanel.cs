@@ -3,9 +3,6 @@ using UnityEngine;
 public class ReactivePanel : MonoBehaviour
 {
     [SerializeField]
-    private PlaybackManager mgr;
-
-    [SerializeField]
     private ImageFader[] fadeMaps;
 
     [SerializeField]
@@ -14,19 +11,23 @@ public class ReactivePanel : MonoBehaviour
     [SerializeField]
     private ImageFader fadeBottomText;
 
-    private int CurVid => mgr.CurrentPlayingIndex;
+    private int lastVid = -1;
 
-    private int lastVid = -2;
-
-    private void Update()
+    private void Start()
     {
-        if (lastVid != CurVid) UpdateUIs();
+        UpdateUIs();
+    }
+
+    public void OnUIChangeNeeded(int newVid)
+    {
+        if (lastVid == newVid) return;
+        lastVid = newVid;
+        UpdateUIs();
     }
 
     private void UpdateUIs()
     {
-        lastVid = CurVid;
-        Debug.Log(lastVid);
+        //Debug.Log(lastVid);
         bool isOff = lastVid <= 0;
         for (int i = 0; i < fadeMaps.Length; ++i)
         {
