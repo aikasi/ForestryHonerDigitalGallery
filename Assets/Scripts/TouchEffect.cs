@@ -1,70 +1,85 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
+[DefaultExecutionOrder(10)]
 public class TouchEffect : MonoBehaviour
 {
     [SerializeField]
-    private GameObject prefabFX;
+    private RectTransform particlePrefab;
 
     [SerializeField]
-    private int poolSize = 8;
+    private RectTransform particleParent;
 
-    private RectTransform[] pools;
+    [SerializeField]
+    private int poolSize = 10;
 
-    public UnityEvent onAnyClick;
-    private int curFX = 0;
+    [SerializeField]
+    private float lifetime = 1f;
 
-    private void Start()
+    [SerializeField]
+    private Image[] blockedAreas;
+
+    public UnityEvent onAnyTouch;
+
+    private RectTransform[] pool;
+    private int poolIndex = 0;
+
+    private float intendedScreenWidth = 1920f;
+
+    private void Awake()
     {
-        curFX = 0;
-        prefabFX.SetActive(false);
-        pools = new RectTransform[poolSize];
-        for (int i = 0; i < poolSize; ++i)
+        intendedScreenWidth = particleParent.rect.width;
+        particlePrefab.gameObject.SetActive(false);
+        pool = new RectTransform[poolSize];
+        for (int i = 0; i < poolSize; i++)
         {
-            var obj = Instantiate(prefabFX, transform);
-            obj.name = $"{prefabFX.name} ({i})";
-            obj.SetActive(false); // just in case
-            pools[i] = obj.transform as RectTransform;
+            var obj = Instantiate(particlePrefab, particleParent);
+            obj.gameObject.SetActive(false);
+            pool[i] = obj;
         }
-    }
-
-    private static IEnumerator HideLater(GameObject obj)
-    {
-        yield return new WaitForSeconds(1f);
-        obj.SetActive(false);
     }
 
     private void Update()
     {
-        bool isPressed = false;
-        Vector2 inputPosition = Vector2.zero;
-
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        if (Input.GetMouseButtonDown(0)) TrySpawn(Input.mousePosition);
+        foreach (var touch in Input.touches)
         {
-            isPressed = true;
-            inputPosition = Mouse.current.position.ReadValue();
+            if (touch.phase != TouchPhase.Began) continue;
+            TrySpawn(touch.position);
         }
-        else if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+    }
+
+    private void TrySpawn(Vector2 screenPos)
+    {
+        onAnyTouch?.Invoke();
+
+        if (IsBlocked(screenPos)) return;
+
+        var obj = pool[poolIndex];
+        poolIndex = (poolIndex + 1) % poolSize;
+
+        obj.anchoredPosition = screenPos * (intendedScreenWidth / Mathf.Max(1f, Screen.width));
+        obj.gameObject.SetActive(false);
+        obj.gameObject.SetActive(true);
+
+        StartCoroutine(DeactivateAfter(obj.gameObject, lifetime));
+    }
+
+    private bool IsBlocked(Vector2 screenPos)
+    {
+        foreach (var area in blockedAreas)
         {
-            isPressed = true;
-            inputPosition = Touchscreen.current.primaryTouch.position.ReadValue();
+            if (!area.isActiveAndEnabled) continue;
+            if (RectTransformUtility.RectangleContainsScreenPoint(area.rectTransform, screenPos, Camera.main))
+                return true;
         }
+        return false;
+    }
 
-        if (isPressed)
-        {
-            pools[curFX].anchoredPosition = inputPosition;
-            pools[curFX].gameObject.SetActive(true);
-
-            StartCoroutine(HideLater(pools[curFX].gameObject));
-
-            curFX = (curFX + 1) % poolSize;
-
-            if (onAnyClick != null)
-            {
-                onAnyClick.Invoke();
-            }
-        }
+    private System.Collections.IEnumerator DeactivateAfter(GameObject obj, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        obj.SetActive(false);
     }
 }

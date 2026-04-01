@@ -829,9 +829,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8e74d21324f0cb044880160b0ea3ce23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TouchEffect
-  prefabFX: {fileID: 2028801570}
+  particlePrefab: {fileID: 2028801571}
+  particleParent: {fileID: 152645478}
   poolSize: 16
-  onAnyClick:
+  lifetime: 0.6
+  blockedAreas: []
+  onAnyTouch:
     m_PersistentCalls:
       m_Calls: []
 --- !u!1 &162079505
