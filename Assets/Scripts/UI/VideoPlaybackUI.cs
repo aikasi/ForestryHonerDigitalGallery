@@ -11,6 +11,13 @@ public class VideoPlaybackUI : MonoBehaviour
     [Header("Button References")]
     [SerializeField] private Image[] buttonImages;
 
+    [Header("Feature Toggles")]
+    [Tooltip("체크 해제 시 버튼 이미지 교체(On/Off) 기능이 비활성화됩니다.")]
+    [SerializeField] private bool enableImageSwap = true;
+    
+    [Tooltip("체크 해제 시 버튼 흔들림(Shake) 효과가 비활성화됩니다.")]
+    [SerializeField] private bool enableShakeEffect = true;
+
     [Header("Animation Settings")]
     [SerializeField] private float shakeAmplitude = 10f;
     [SerializeField] private float shakeDuration = 0.5f;
@@ -59,6 +66,21 @@ public class VideoPlaybackUI : MonoBehaviour
         shakeSequences.Clear();
 
         DestroyAllOnSprites();
+
+        // _off 및 0_main 등 아직 해제되지 않은 모든 잔여 텍스처 강제 반환 (VRAM 누수 차단)
+        foreach (var kvp in spriteCache)
+        {
+            Sprite sprite = kvp.Value;
+            if (sprite != null)
+            {
+                if (sprite.texture != null)
+                {
+                    Destroy(sprite.texture);
+                }
+                Destroy(sprite);
+            }
+        }
+        spriteCache.Clear();
     }
 
     private IEnumerator InitialSpriteLoad()
@@ -243,9 +265,15 @@ public class VideoPlaybackUI : MonoBehaviour
             if (index >= 0 && index < buttonImages.Length)
             {
                 currentPlayingButtonIndex = index;
-                LoadOnSpriteIfNeeded(index);
-                SetButtonImage(index, true);
-                PlayShake(index);
+                if (enableImageSwap)
+                {
+                    LoadOnSpriteIfNeeded(index);
+                    SetButtonImage(index, true);
+                }
+                if (enableShakeEffect)
+                {
+                    PlayShake(index);
+                }
             }
         }
         else
@@ -296,6 +324,9 @@ public class VideoPlaybackUI : MonoBehaviour
 
     private void SetButtonImage(int index, bool isOn)
     {
+        // enableImageSwap이 꺼져 있어도 off(기본) 이미지는 항상 적용 허용
+        // on 이미지 전환만 차단하여, 버튼이 빈 상태로 남는 것을 방지
+        if (!enableImageSwap && isOn) return;
         if (index < 0 || index >= buttonImages.Length) return;
 
         Sprite sprite = GetCachedSprite(index, isOn);
@@ -311,6 +342,7 @@ public class VideoPlaybackUI : MonoBehaviour
 
     private void PlayShake(int index)
     {
+        if (!enableShakeEffect) return;
         if (index < 0 || index >= buttonImages.Length) return;
 
         StopShake(index);
