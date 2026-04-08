@@ -4,17 +4,34 @@ using UnityEngine.Networking;
 using System.Collections;
 
 /// <summary>
-/// 터치 모니터에서 인물 버튼 선택 시 캡션(디테일) 패널을 표시하는 매니저.
-/// StreamingAssets 폴더에서 이미지를 비동기로 불러오고, 닫힐 때 메모리를 즉시 해제합니다.
-/// 인스펙터의 Is Feature Enabled 체크박스로 기능 전체를 끄고 켤 수 있습니다.
+/// 터치 모니터에서 인물 버튼 선택 시 디테일 팝업을 표시하는 매니저.
+/// StreamingAssets 폴더에서 배경, 닫기 버튼, 인물별 이미지 2장을 비동기로 로드합니다.
+/// 모든 이미지는 외부(StreamingAssets)에서 동적으로 로드되므로 빌드 없이 교체 가능합니다.
 /// </summary>
 public class DetailPanelManager : MonoBehaviour
 {
     [Header("UI References")]
-    [Tooltip("캡션(디테일) 이미지를 띄울 전체 패널 오브젝트 (활성화/비활성화 용도)")]
+    [Tooltip("디테일 팝업 전체 패널 오브젝트 (활성화/비활성화 용도)")]
     [SerializeField] private GameObject captionPanel;
-    [Tooltip("캡션 이미지를 실제로 표시할 RawImage 컴포넌트")]
-    [SerializeField] private RawImage captionRawImage;
+
+    [Tooltip("팝업 배경 이미지 (DetailBackground.png 동적 로드 대상)")]
+    [SerializeField] private RawImage backgroundImage;
+
+    [Tooltip("인물 소개 텍스트 카드 ({index}_1_detail.png 동적 로드 대상)")]
+    [SerializeField] private RawImage detailInfoImage;
+
+    [Tooltip("인물 사진 ({index}_2_detail.png 동적 로드 대상)")]
+    [SerializeField] private RawImage detailPhotoImage;
+
+    [Tooltip("닫기(뒤로가기) 버튼 이미지 (detail_back.png 동적 로드 대상)")]
+    [SerializeField] private Image closeButtonImage;
+
+    [Tooltip("팝업 텍스트 디자인 파츠 (0_1_main.png 동적 로드 대상)")]
+    [SerializeField] private RawImage commonDecoImage1;
+
+    [Tooltip("팝업 타이틀 디자인 파츠 (0_3_main.png 동적 로드 대상)")]
+    [SerializeField] private RawImage commonDecoImage3;
+
     [Tooltip("패널을 닫을 버튼 (할당하면 자동으로 닫기 기능이 연결됩니다)")]
     [SerializeField] private Button closeButton;
 
@@ -31,10 +48,17 @@ public class DetailPanelManager : MonoBehaviour
     // 비동기 로딩 코루틴 참조 (광클릭 방어용)
     private Coroutine loadCoroutine;
     // 현재 진행 중인 웹 요청 참조 (도중 취소용)
-    private UnityWebRequest currentRequest;
-    // 현재 화면에 표시 중인 텍스처 (메모리 해제 대상)
-    private Texture2D currentTexture;
-    
+    private UnityWebRequest currentRequest1;
+    private UnityWebRequest currentRequest2;
+    // 현재 화면에 표시 중인 텍스처들 (메모리 해제 대상)
+    private Texture2D currentInfoTexture;
+    private Texture2D currentPhotoTexture;
+    // 공통 리소스 텍스처 (앱 종료 시 해제)
+    private Texture2D backgroundTexture;
+    private Sprite closeButtonSprite;
+    private Texture2D deco1Texture; // 0_1_main
+    private Texture2D deco3Texture; // 0_3_main
+
     // 비동기 닫힘 대기 중 새 로딩이 시작되는 것을 감지하기 위한 토큰
     private int loadToken = 0;
 
@@ -47,6 +71,9 @@ public class DetailPanelManager : MonoBehaviour
 
         // 시작 시 패널 닫기
         HidePanelImmediate();
+
+        // 공통 리소스(배경, 닫기 버튼) 1회 로드
+        StartCoroutine(LoadCommonResources());
 
         // 영상 재생 상태 변경 이벤트 구독
         if (playbackManager != null)
@@ -63,6 +90,9 @@ public class DetailPanelManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        // 최우선으로 진행 중인 모든 비동기 다운로드 및 코루틴 강제 취소
+        CancelLoading();
+
         // 이벤트 구독 해제 (메모리 누수 방지)
         if (playbackManager != null)
         {
@@ -75,8 +105,127 @@ public class DetailPanelManager : MonoBehaviour
             closeButton.onClick.RemoveListener(OnCloseButtonClicked);
         }
 
-        // 잔여 텍스처 메모리 강제 반환
-        ReleaseTexture();
+        // 인물별 텍스처 메모리 강제 반환
+        ReleaseDetailTextures();
+
+        // 공통 리소스 메모리 해제
+        if (backgroundTexture != null)
+        {
+            Destroy(backgroundTexture);
+            backgroundTexture = null;
+        }
+        if (deco1Texture != null)
+        {
+            Destroy(deco1Texture);
+            deco1Texture = null;
+        }
+        if (deco3Texture != null)
+        {
+            Destroy(deco3Texture);
+            deco3Texture = null;
+        }
+        if (closeButtonSprite != null)
+        {
+            if (closeButtonSprite.texture != null) Destroy(closeButtonSprite.texture);
+            Destroy(closeButtonSprite);
+            closeButtonSprite = null;
+        }
+    }
+
+    /// <summary>
+    /// 공통 리소스(배경, 닫기 버튼 이미지)를 앱 시작 시 1회만 로드합니다.
+    /// </summary>
+    private IEnumerator LoadCommonResources()
+    {
+        // 배경 이미지 로드
+        yield return StartCoroutine(LoadTextureCoroutine("DetailBackground.png", (texture) =>
+        {
+            if (texture == null) return;
+            backgroundTexture = texture; // UI 연결 여부와 무관하게 반드시 추적 (누수 방지)
+            if (backgroundImage != null)
+            {
+                backgroundImage.texture = texture;
+                backgroundImage.color = Color.white;
+                if (logger != null) logger.Enqueue("[DetailPanelManager] 공통 배경 이미지 로드 완료");
+            }
+            else
+            {
+                if (logger != null) logger.Enqueue("[DetailPanelManager] 경고: backgroundImage가 미할당 상태입니다. 텍스처는 추적 중.");
+            }
+        }));
+
+        // 닫기 버튼 이미지 로드
+        yield return StartCoroutine(LoadTextureCoroutine("detail_back.png", (texture) =>
+        {
+            if (texture == null) return;
+            // Sprite.Create는 원본 텍스처를 참조하므로, Sprite를 통해 텍스처의 수명도 관리됨
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f
+            );
+            sprite.name = "detail_back";
+            closeButtonSprite = sprite; // UI 연결 여부와 무관하게 반드시 추적 (누수 방지)
+            if (closeButtonImage != null)
+            {
+                closeButtonImage.sprite = sprite;
+                if (logger != null) logger.Enqueue("[DetailPanelManager] 닫기 버튼 이미지 로드 완료");
+            }
+            else
+            {
+                if (logger != null) logger.Enqueue("[DetailPanelManager] 경고: closeButtonImage가 미할당 상태입니다. 스프라이트는 추적 중.");
+            }
+        }));
+
+        // 팝업 장식용 (0_1_main) 로드
+        yield return StartCoroutine(LoadTextureCoroutine("0_1_main.png", (texture) =>
+        {
+            if (texture == null) return;
+            deco1Texture = texture; // 반드시 추적
+            if (commonDecoImage1 != null)
+            {
+                commonDecoImage1.texture = texture;
+                commonDecoImage1.color = Color.white;
+            }
+        }));
+
+        // 팝업 장식용 (0_3_main) 로드
+        yield return StartCoroutine(LoadTextureCoroutine("0_3_main.png", (texture) =>
+        {
+            if (texture == null) return;
+            deco3Texture = texture; // 반드시 추적
+            if (commonDecoImage3 != null)
+            {
+                commonDecoImage3.texture = texture;
+                commonDecoImage3.color = Color.white;
+            }
+        }));
+    }
+
+    /// <summary>
+    /// 범용 텍스처 로딩 코루틴. 파일명을 받아 StreamingAssets에서 로드 후 콜백으로 전달합니다.
+    /// </summary>
+    private IEnumerator LoadTextureCoroutine(string filename, System.Action<Texture2D> onComplete)
+    {
+        string path = System.IO.Path.Combine(Application.streamingAssetsPath, filename);
+
+        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(path))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                Texture2D texture = DownloadHandlerTexture.GetContent(request);
+                texture.filterMode = FilterMode.Bilinear;
+                onComplete?.Invoke(texture);
+            }
+            else
+            {
+                if (logger != null) logger.Enqueue($"[DetailPanelManager] 이미지 로드 실패: {filename}, 오류: {request.error}");
+                onComplete?.Invoke(null);
+            }
+        }
     }
 
     /// <summary>
@@ -100,7 +249,7 @@ public class DetailPanelManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 지정된 인덱스의 디테일 이미지를 비동기로 로드하여 패널에 표시합니다.
+    /// 지정된 인덱스의 디테일 이미지 2장을 비동기로 로드하여 패널에 표시합니다.
     /// </summary>
     private void LoadAndShow(int index)
     {
@@ -109,42 +258,63 @@ public class DetailPanelManager : MonoBehaviour
         // 이전 로딩 작업이 진행 중이면 즉시 취소 (광클릭 방어)
         CancelLoading();
 
-        loadCoroutine = StartCoroutine(LoadImageCoroutine(index));
+        loadCoroutine = StartCoroutine(LoadDetailImagesCoroutine(index));
     }
 
     /// <summary>
-    /// 비동기 이미지 로딩 코루틴.
-    /// StreamingAssets/0001_Detail.png 를 탐색하여 로드합니다.
-    /// 취소 시 메모리 최적화를 위해 using 대신 명시적 수동 해제를 사용합니다.
+    /// 인물별 디테일 이미지 2장을 동시에 로드하는 코루틴.
+    /// {index}_1_detail.png (소개 카드) + {index}_2_detail.png (인물 사진)
     /// </summary>
-    private IEnumerator LoadImageCoroutine(int index)
+    private IEnumerator LoadDetailImagesCoroutine(int index)
     {
-        // 파일명 포맷: 01_Detail, 02_Detail ... 08_Detail (기존 영상 파일명 규칙과 통일)
-        string filename = $"{index:D2}_Detail.png";
-        string path = System.IO.Path.Combine(Application.streamingAssetsPath, filename);
+        string filename1 = $"{index}_1_detail.png";
+        string filename2 = $"{index}_2_detail.png";
+        string path1 = System.IO.Path.Combine(Application.streamingAssetsPath, filename1);
+        string path2 = System.IO.Path.Combine(Application.streamingAssetsPath, filename2);
 
-        currentRequest = UnityWebRequestTexture.GetTexture(path);
-        
-        yield return currentRequest.SendWebRequest();
+        // 두 요청을 동시에 시작
+        currentRequest1 = UnityWebRequestTexture.GetTexture(path1);
+        currentRequest2 = UnityWebRequestTexture.GetTexture(path2);
 
-        // 도중 CancelLoading() 이 호출되어 currentRequest가 null이 된 경우 중단
-        if (currentRequest == null) yield break;
+        var op1 = currentRequest1.SendWebRequest();
+        var op2 = currentRequest2.SendWebRequest();
 
-        if (currentRequest.result == UnityWebRequest.Result.Success)
+        // 두 요청 모두 완료될 때까지 대기
+        while (!op1.isDone || !op2.isDone)
+        {
+            yield return null;
+        }
+
+        // 도중 CancelLoading()이 호출되어 요청이 null이 된 경우 중단
+        if (currentRequest1 == null || currentRequest2 == null) yield break;
+
+        bool success1 = currentRequest1.result == UnityWebRequest.Result.Success;
+        bool success2 = currentRequest2.result == UnityWebRequest.Result.Success;
+
+        if (success1 && success2)
         {
             // 이전 텍스처가 남아있다면 먼저 해제
-            ReleaseTexture();
+            ReleaseDetailTextures();
 
             // 새 텍스처 추출 및 저장
-            Texture2D texture = DownloadHandlerTexture.GetContent(currentRequest);
-            texture.filterMode = FilterMode.Bilinear;
-            currentTexture = texture;
+            Texture2D infoTex = DownloadHandlerTexture.GetContent(currentRequest1);
+            infoTex.filterMode = FilterMode.Bilinear;
+            currentInfoTexture = infoTex;
 
-            // UI에 텍스처 할당 및 패널 활성화
-            if (captionRawImage != null)
+            Texture2D photoTex = DownloadHandlerTexture.GetContent(currentRequest2);
+            photoTex.filterMode = FilterMode.Bilinear;
+            currentPhotoTexture = photoTex;
+
+            // UI에 텍스처 할당
+            if (detailInfoImage != null)
             {
-                captionRawImage.texture = currentTexture;
-                captionRawImage.color = Color.white;
+                detailInfoImage.texture = currentInfoTexture;
+                detailInfoImage.color = Color.white;
+            }
+            if (detailPhotoImage != null)
+            {
+                detailPhotoImage.texture = currentPhotoTexture;
+                detailPhotoImage.color = Color.white;
             }
 
             // 팝업 애니메이션 처리
@@ -166,43 +336,39 @@ public class DetailPanelManager : MonoBehaviour
             }
 
             if (logger != null)
-                logger.Enqueue($"[DetailPanelManager] 캡션 패널 열기 완료: {filename}");
+                logger.Enqueue($"[DetailPanelManager] 디테일 패널 열기 완료: {filename1}, {filename2}");
         }
         else
         {
-            if (logger != null)
-                logger.Enqueue($"[DetailPanelManager] 캡션 이미지 로드 실패: {filename}, 오류: {currentRequest.error}");
-            // 로드 실패 시 투명 팝업이 유지되지 않도록 방어
+            // 하나라도 실패하면 에러 로그 출력 및 패널 숨김
+            if (!success1 && logger != null)
+                logger.Enqueue($"[DetailPanelManager] 이미지 로드 실패: {filename1}, 오류: {currentRequest1.error}");
+            if (!success2 && logger != null)
+                logger.Enqueue($"[DetailPanelManager] 이미지 로드 실패: {filename2}, 오류: {currentRequest2.error}");
             HidePanelImmediate();
         }
 
-        // 정상/실패 종료 시 리소스 해제
-        if (currentRequest != null)
-        {
-            currentRequest.Dispose();
-            currentRequest = null;
-        }
-
+        // 요청 리소스 정리
+        DisposeRequests();
         loadCoroutine = null;
     }
 
     /// <summary>
-    /// 사용자 직접 터치(ex: 닫기 버튼)에 의해 호출됩니다.
+    /// 사용자 직접 터치(닫기 버튼)에 의해 호출됩니다.
     /// 패널을 닫음과 동시에 영상을 대기 영상(Idle)으로 전환합니다.
     /// </summary>
     public void OnCloseButtonClicked()
     {
-        // UI 패널 닫기 모션 처리 및 메인 영상 대기 화면 전환
         ClosePanel(returnToIdle: true);
     }
 
     /// <summary>
     /// 패널을 닫고 메모리를 해제합니다.
-    /// returnToIdle 가 true일 경우, 닫힘과 동시에 메인 시스템을 대기 영상으로 돌려보냅니다.
+    /// returnToIdle이 true일 경우, 메인 시스템을 대기 영상으로 돌려보냅니다.
     /// </summary>
     public async void ClosePanel(bool returnToIdle = false)
     {
-        int currentToken = ++loadToken; // 닫기 작업 시작 표식
+        int currentToken = ++loadToken;
 
         CancelLoading();
 
@@ -213,7 +379,7 @@ public class DetailPanelManager : MonoBehaviour
             if (logger != null) logger.Enqueue("[DetailPanelManager] 캡션 수동 닫힘 - 영상 대기 전환을 요청합니다.");
         }
 
-        // 팝업 퇴장 애니메이션 실행 (할당되어 있고, 패널이 현재 활성 상태인 경우)
+        // 팝업 퇴장 애니메이션 실행
         bool hasAnimated = false;
         if (popupTransition != null && captionPanel != null && captionPanel.activeSelf)
         {
@@ -225,7 +391,7 @@ public class DetailPanelManager : MonoBehaviour
             }
         }
 
-        // 애니메이션 대기 도중 새 캡션 로드가 시작되었다면 여기서 중단 (닫기 무효화)
+        // 애니메이션 대기 도중 새 캡션 로드가 시작되었다면 닫기 무효화
         if (loadToken != currentToken) return;
 
         // 애니메이션이 없었거나 끝난 후 최종 정리
@@ -233,7 +399,13 @@ public class DetailPanelManager : MonoBehaviour
         {
             HidePanelImmediate();
         }
-        ReleaseTexture();
+        else
+        {
+            // 애니메이션이 끝났더라도 RawImage의 texture 참조를 null로 비워서 dangling reference 방지
+            if (detailInfoImage != null) detailInfoImage.texture = null;
+            if (detailPhotoImage != null) detailPhotoImage.texture = null;
+        }
+        ReleaseDetailTextures();
     }
 
     /// <summary>
@@ -247,11 +419,25 @@ public class DetailPanelManager : MonoBehaviour
             loadCoroutine = null;
         }
 
-        if (currentRequest != null)
+        DisposeRequests();
+    }
+
+    /// <summary>
+    /// 현재 보유 중인 UnityWebRequest를 정리합니다.
+    /// </summary>
+    private void DisposeRequests()
+    {
+        if (currentRequest1 != null)
         {
-            currentRequest.Abort();
-            currentRequest.Dispose();
-            currentRequest = null;
+            if (!currentRequest1.isDone) currentRequest1.Abort();
+            currentRequest1.Dispose();
+            currentRequest1 = null;
+        }
+        if (currentRequest2 != null)
+        {
+            if (!currentRequest2.isDone) currentRequest2.Abort();
+            currentRequest2.Dispose();
+            currentRequest2 = null;
         }
     }
 
@@ -265,21 +451,25 @@ public class DetailPanelManager : MonoBehaviour
             captionPanel.SetActive(false);
         }
 
-        if (captionRawImage != null)
-        {
-            captionRawImage.texture = null;
-        }
+        if (detailInfoImage != null) detailInfoImage.texture = null;
+        if (detailPhotoImage != null) detailPhotoImage.texture = null;
     }
 
     /// <summary>
-    /// 현재 보유한 텍스처의 VRAM 메모리를 즉시 해제합니다.
+    /// 인물별 텍스처의 VRAM 메모리를 즉시 해제합니다.
+    /// 공통 리소스(배경, 닫기 버튼)는 해제하지 않습니다.
     /// </summary>
-    private void ReleaseTexture()
+    private void ReleaseDetailTextures()
     {
-        if (currentTexture != null)
+        if (currentInfoTexture != null)
         {
-            Destroy(currentTexture);
-            currentTexture = null;
+            Destroy(currentInfoTexture);
+            currentInfoTexture = null;
+        }
+        if (currentPhotoTexture != null)
+        {
+            Destroy(currentPhotoTexture);
+            currentPhotoTexture = null;
         }
     }
 }

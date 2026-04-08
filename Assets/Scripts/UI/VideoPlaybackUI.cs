@@ -9,7 +9,12 @@ using DG.Tweening;
 public class VideoPlaybackUI : MonoBehaviour
 {
     [Header("Button References")]
+    [Tooltip("1~8번 인물 버튼 이미지 배열 (buttonImages[0]은 사용하지 않음)")]
     [SerializeField] private Image[] buttonImages;
+
+    [Header("Standby Screen Images")]
+    [Tooltip("대기화면 이미지 슬롯 3개 (0_1_main, 0_2_main, 0_3_main 동적 로드 대상)")]
+    [SerializeField] private Image[] standbyImages;
 
     [Header("Feature Toggles")]
     [Tooltip("체크 해제 시 버튼 이미지 교체(On/Off) 기능이 비활성화됩니다.")]
@@ -34,6 +39,8 @@ public class VideoPlaybackUI : MonoBehaviour
     private UnityEngine.UI.GridLayoutGroup gridLayout;
     private int currentPlayingButtonIndex = -1;
     private HashSet<string> loadedOnSprites = new HashSet<string>();
+    // 대기화면 이미지용 스프라이트 캐시 (별도 관리)
+    private List<Sprite> standbySprites = new List<Sprite>();
 
     private void Start()
     {
@@ -67,7 +74,7 @@ public class VideoPlaybackUI : MonoBehaviour
 
         DestroyAllOnSprites();
 
-        // _off 및 0_main 등 아직 해제되지 않은 모든 잔여 텍스처 강제 반환 (VRAM 누수 차단)
+        // _off 등 아직 해제되지 않은 모든 잔여 텍스처 강제 반환 (VRAM 누수 차단)
         foreach (var kvp in spriteCache)
         {
             Sprite sprite = kvp.Value;
@@ -81,6 +88,17 @@ public class VideoPlaybackUI : MonoBehaviour
             }
         }
         spriteCache.Clear();
+
+        // 대기화면 이미지 텍스처 해제
+        foreach (var sprite in standbySprites)
+        {
+            if (sprite != null)
+            {
+                if (sprite.texture != null) Destroy(sprite.texture);
+                Destroy(sprite);
+            }
+        }
+        standbySprites.Clear();
     }
 
     private IEnumerator InitialSpriteLoad()
@@ -91,7 +109,14 @@ public class VideoPlaybackUI : MonoBehaviour
 
         List<Coroutine> loadCoroutines = new List<Coroutine>();
 
-        loadCoroutines.Add(StartCoroutine(LoadSpriteCoroutine(0, false)));
+        // 대기화면 이미지 3장 로드 (0_1_main, 0_2_main, 0_3_main)
+        int standbyCount = standbyImages != null ? standbyImages.Length : 0;
+        for (int i = 0; i < standbyCount; i++)
+        {
+            loadCoroutines.Add(StartCoroutine(LoadStandbyImageCoroutine(i)));
+        }
+
+        // 인물 버튼 off 이미지 로드 (1번부터)
         for (int i = 1; i < buttonCount; i++)
         {
             loadCoroutines.Add(StartCoroutine(LoadSpriteCoroutine(i, false)));
@@ -102,7 +127,7 @@ public class VideoPlaybackUI : MonoBehaviour
             yield return coroutine;
         }
 
-        SetButtonImage(0, false);
+        // 인물 버튼 off 이미지 적용 (1번부터)
         for (int i = 1; i < buttonCount; i++)
         {
             SetButtonImage(i, false);
@@ -111,20 +136,71 @@ public class VideoPlaybackUI : MonoBehaviour
         isInitialLoadingComplete = true;
         UpdateAllButtonsInteractable(true);
 
-        if (logger != null) logger.Enqueue("[VideoPlaybackUI] Initial sprite loading complete");
+        if (logger != null) logger.Enqueue("[VideoPlaybackUI] 초기 스프라이트 로딩 완료");
+    }
+
+    /// <summary>
+    /// 대기화면 이미지를 StreamingAssets에서 로드하여 standbyImages에 적용합니다.
+    /// 파일명: 0_{slotIndex+1}_main.png
+    /// </summary>
+    private IEnumerator LoadStandbyImageCoroutine(int slotIndex)
+    {
+        string filename = $"0_{slotIndex + 1}_main.png";
+        string path = System.IO.Path.Combine(Application.streamingAssetsPath, filename);
+
+        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(path))
+        {
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                Texture2D texture = DownloadHandlerTexture.GetContent(request);
+                texture.filterMode = FilterMode.Bilinear;
+
+                // 대기화면 이미지의 RectTransform 기준으로 PPU 계산
+                float ppu = 100f;
+                if (standbyImages != null && slotIndex < standbyImages.Length && standbyImages[slotIndex] != null)
+                {
+                    RectTransform rect = standbyImages[slotIndex].rectTransform;
+                    Vector2 size = rect.sizeDelta;
+                    if (size.x > 0 && size.y > 0)
+                    {
+                        float ppuW = texture.width / size.x;
+                        float ppuH = texture.height / size.y;
+                        ppu = (ppuW + ppuH) / 2f;
+                    }
+                }
+
+                Sprite sprite = Sprite.Create(
+                    texture,
+                    new Rect(0, 0, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f),
+                    ppu
+                );
+                sprite.name = filename;
+                standbySprites.Add(sprite);
+
+                // 슬롯에 즉시 적용
+                if (standbyImages != null && slotIndex < standbyImages.Length && standbyImages[slotIndex] != null)
+                {
+                    standbyImages[slotIndex].sprite = sprite;
+                }
+
+                if (logger != null) logger.Enqueue($"[VideoPlaybackUI] 대기화면 이미지 로드: {filename}, PPU: {ppu:F2}");
+            }
+            else
+            {
+                if (logger != null) logger.Enqueue($"[VideoPlaybackUI] 대기화면 이미지 로드 실패: {filename}, 오류: {request.error}");
+            }
+        }
     }
 
     private IEnumerator LoadSpriteCoroutine(int index, bool isOn)
     {
-        string filename;
-        if (index == 0)
-        {
-            filename = "0_main.png";
-        }
-        else
-        {
-            filename = $"{index}_{ (isOn ? "on" : "off" )}.png";
-        }
+        // index 0은 더 이상 여기서 처리하지 않음 (LoadStandbyImageCoroutine에서 담당)
+        if (index <= 0) yield break;
+
+        string filename = $"{index}_{(isOn ? "on" : "off")}.png";
 
         string path = System.IO.Path.Combine(Application.streamingAssetsPath, filename);
 
@@ -177,19 +253,13 @@ public class VideoPlaybackUI : MonoBehaviour
 
     private Sprite GetCachedSprite(int index, bool isOn)
     {
-        string filename;
-        if (index == 0)
-        {
-            filename = "0_main.png";
-        }
-        else
-        {
-            filename = $"{index}_{ (isOn ? "on" : "off" )}.png";
-        }
+        if (index <= 0) return null;
 
-        if (spriteCache.TryGetValue(filename, out Sprite sprite))
+        string filename = $"{index}_{(isOn ? "on" : "off")}.png";
+        
+        if (spriteCache.TryGetValue(filename, out Sprite cachedSprite))
         {
-            return sprite;
+            return cachedSprite;
         }
         return null;
     }
